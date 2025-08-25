@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Management - Tranzio</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-name">Tranzio</div>
+    
+    <nav class="navbar">
+        <a href="index.html" class="nav-link">
+            <i class="fas fa-home"></i> Home
+        </a>
+        <a href="track.html" class="nav-link">
+            <i class="fas fa-location-dot"></i> Track Bus
+        </a>
+    </nav>
+
+    <div class="container">
+        <header class="page-header">
+            <h1><i class="fas fa-cogs"></i> Bus Management System</h1>
+            <p>CRUD operations for managing bus fleet</p>
+        </header>
+
+        <div class="management-container">
+            <!-- Add/Update Bus Form -->
+            <div class="form-section">
+                <div class="form-card">
+                    <h2><i class="fas fa-plus-circle"></i> Add/Update Bus</h2>
+                    <form id="busForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-bus"></i> Bus Number</label>
+                                <input type="number" id="busNo" placeholder="Enter bus number" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-map-marker-alt"></i> Depature From</label>
+                                <input type="text" id="place" placeholder="Enter current location" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-clock"></i> Depature Time</label>
+                                <input type="text" id="time" placeholder="e.g. 09:30 AM" required>
+                            </div>
+                            <div class="form-group">
+                                <label><i class="fas fa-link"></i> Tracking URL</label>
+                                <input type="url" id="url" placeholder="Enter GPS tracking URL">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-route"></i> Routes</label>
+                            <input type="text" id="routes" placeholder="Enter routes separated by commas (e.g. Station, Mall, Airport)">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" onclick="saveBus()" class="save-btn">
+                                <i class="fas fa-save"></i> Save Bus
+                            </button>
+                            <button type="button" onclick="clearForm()" class="clear-btn">
+                                <i class="fas fa-eraser"></i> Clear Form
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Bus List -->
+            <div class="list-section">
+                <div class="list-card">
+                    <div class="list-header">
+                        <h2><i class="fas fa-list"></i> Bus Fleet</h2>
+                        <button onclick="loadAllBuses()" class="refresh-btn">
+                            <i class="fas fa-sync-alt"></i> Refresh
+                        </button>
+                    </div>
+                    <div id="busList" class="bus-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <script>
+        let isUpdateMode = false;
+        let currentBusId = null;
+
+        // Load all buses when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllBuses();
+        });
+
+        async function loadAllBuses() {
+            try {
+                const response = await fetch('http://localhost:8085/bus');
+                const buses = await response.json();
+                displayBuses(buses);
+            } catch (error) {
+                showMessage('Error loading buses: ' + error.message, 'error');
+            }
+        }
+
+        function displayBuses(buses) {
+            const busList = document.getElementById('busList');
+            
+            if (buses.length === 0) {
+                busList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-bus"></i>
+                        <p>No buses found. Add some buses to get started!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            busList.innerHTML = buses.map(bus => `
+                <div class="bus-item" data-bus-id="${bus.id}">
+                    <div class="bus-item-header">
+                        <h3><i class="fas fa-bus"></i> Bus #${bus.busNo}</h3>
+                        <div class="bus-actions">
+                            <button onclick="editBus(${bus.busNo})" class="edit-btn" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button onclick="deleteBus(${bus.busNo})" class="delete-btn" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="bus-item-content">
+                        <div class="bus-detail">
+                            <span class="detail-label"><i class="fas fa-map-marker-alt"></i> Location:</span>
+                            <span class="detail-value">${bus.place}</span>
+                        </div>
+                        <div class="bus-detail">
+                            <span class="detail-label"><i class="fas fa-clock"></i> Time:</span>
+                            <span class="detail-value">${bus.time}</span>
+                        </div>
+                        <div class="bus-detail">
+                            <span class="detail-label"><i class="fas fa-route"></i> Routes:</span>
+                            <span class="detail-value">${bus.routes ? bus.routes.join(' → ') : 'No routes'}</span>
+                        </div>
+                        ${bus.url ? `
+                        <div class="bus-detail">
+                            <span class="detail-label"><i class="fas fa-link"></i> Tracking:</span>
+                            <a href="${bus.url}" target="_blank" class="tracking-link">Open Live Track</a>
+                        </div>` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function saveBus() {
+            const busData = {
+                busNo: parseInt(document.getElementById('busNo').value),
+                place: document.getElementById('place').value,
+                time: document.getElementById('time').value,
+                url: document.getElementById('url').value || null,
+                routes: document.getElementById('routes').value.split(',').map(route => route.trim()).filter(route => route)
+            };
+
+            if (!busData.busNo || !busData.place || !busData.time) {
+                showMessage('Please fill in all required fields', 'error');
+                return;
+            }
+
+            try {
+                const method = isUpdateMode ? 'PUT' : 'POST';
+                const response = await fetch('http://localhost:8085/bus', {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(busData)
+                });
+
+                if (response.ok) {
+                    showMessage(`Bus ${isUpdateMode ? 'updated' : 'added'} successfully!`, 'success');
+                    clearForm();
+                    loadAllBuses();
+                } else {
+                    showMessage('Error saving bus', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function editBus(busNo) {
+            try {
+                const response = await fetch(`http://localhost:8085/bus/${busNo}`);
+                const bus = await response.json();
+                
+                // Populate form with bus data
+                document.getElementById('busNo').value = bus.busNo;
+                document.getElementById('place').value = bus.place;
+                document.getElementById('time').value = bus.time;
+                document.getElementById('url').value = bus.url || '';
+                document.getElementById('routes').value = bus.routes ? bus.routes.join(', ') : '';
+                
+                isUpdateMode = true;
+                currentBusId = bus.id;
+                
+                // Update form title
+                const formTitle = document.querySelector('.form-card h2');
+                formTitle.innerHTML = '<i class="fas fa-edit"></i> Update Bus';
+                
+                // Scroll to form
+                document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+                
+                showMessage('Bus loaded for editing', 'info');
+            } catch (error) {
+                showMessage('Error loading bus for edit: ' + error.message, 'error');
+            }
+        }
+
+        async function deleteBus(busNo) {
+            if (!confirm(`Are you sure you want to delete bus #${busNo}?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`http://localhost:8085/bus/${busNo}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showMessage('Bus deleted successfully!', 'success');
+                    loadAllBuses();
+                } else {
+                    showMessage('Error deleting bus', 'error');
+                }
+            } catch (error) {
+                showMessage('Error: ' + error.message, 'error');
+            }
+        }
+
+        function clearForm() {
+            document.getElementById('busForm').reset();
+            isUpdateMode = false;
+            currentBusId = null;
+            
+            // Reset form title
+            const formTitle = document.querySelector('.form-card h2');
+            formTitle.innerHTML = '<i class="fas fa-plus-circle"></i> Add/Update Bus';
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    msg.textContent = '';
+                    msg.className = 'message';
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>

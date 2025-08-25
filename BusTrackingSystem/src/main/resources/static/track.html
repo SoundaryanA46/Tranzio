@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Bus - Tranzio</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-name">Tranzio</div>
+    
+    <nav class="navbar">
+        <a href="index.html" class="nav-link">
+            <i class="fas fa-home"></i> Home
+        </a>
+        <a href="manage.html" class="nav-link">
+            <i class="fas fa-cogs"></i> Management
+        </a>
+    </nav>
+
+    <div class="container">
+        <header class="page-header">
+            <h1><i class="fas fa-location-dot"></i> Bus Tracking System</h1>
+            <p>Enter your bus number to get real-time location and details</p>
+        </header>
+
+        <div class="tracking-container">
+            <div class="search-section">
+                <div class="search-card">
+                    <h2><i class="fas fa-search"></i> Find Your Bus</h2>
+                    <div class="input-group">
+                        <i class="fas fa-bus input-icon"></i>
+                        <input type="number" id="busNo" placeholder="Enter bus number (e.g. 101)" />
+                        <button onclick="findBus()" class="search-btn">
+                            <i class="fas fa-search-location"></i>
+                            Track Bus
+                        </button>
+                    </div>
+                    <div id="message" class="message"></div>
+                </div>
+            </div>
+
+            <div class="bus-info-section" id="busInfoSection" style="display: none;">
+                <div class="bus-info-card">
+                    <h3><i class="fas fa-info-circle"></i> Bus Information</h3>
+                    <div class="bus-details" id="busDetails"></div>
+                    <div class="tracking-actions">
+                        <button onclick="openLiveTracking()" class="live-track-btn">
+                            <i class="fas fa-satellite"></i>
+                            Open Live Tracking
+                        </button>
+                        <button onclick="resetSearch()" class="reset-btn">
+                            <i class="fas fa-redo"></i>
+                            Search Again
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features-section">
+            <h3>Tracking Features</h3>
+            <div class="features-grid">
+                <div class="feature-item">
+                    <i class="fas fa-satellite-dish"></i>
+                    <h4>Real-time GPS</h4>
+                    <p>Live location updates</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-route"></i>
+                    <h4>Route Information</h4>
+                    <p>Complete route details</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-clock"></i>
+                    <h4>Time Schedule</h4>
+                    <p>Accurate timing info</p>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <h4>Stop Details</h4>
+                    <p>All bus stops info</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentBusUrl = '';
+
+        async function findBus() {
+            const busNo = document.getElementById("busNo").value.trim();
+            const msg = document.getElementById("message");
+            const busInfoSection = document.getElementById("busInfoSection");
+            const busDetails = document.getElementById("busDetails");
+            
+            msg.textContent = "";
+            msg.className = "message";
+
+            if (!busNo) {
+                showMessage("Please enter a bus number.", "error");
+                return;
+            }
+
+            showMessage("Searching for bus...", "loading");
+
+            try {
+                const res = await fetch(`http://localhost:8085/track/bus/${busNo}`);
+                if (!res.ok) {
+                    showMessage("Bus not found. Please check the bus number.", "error");
+                    busInfoSection.style.display = "none";
+                    return;
+                }
+                
+                const bus = await res.json();
+                currentBusUrl = bus.url;
+                
+                busDetails.innerHTML = `
+                    <div class="detail-row">
+                        <span class="detail-label"><i class="fas fa-bus"></i> Bus Number:</span>
+                        <span class="detail-value">${bus.busNo}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label"><i class="fas fa-map-marker-alt"></i> depature Location:</span>
+                        <span class="detail-value">${bus.place}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label"><i class="fas fa-clock"></i> depature Time:</span>
+                        <span class="detail-value">${bus.time}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label"><i class="fas fa-route"></i> Routes:</span>
+                        <span class="detail-value">${bus.routes ? bus.routes.join(' → ') : 'No routes available'}</span>
+                    </div>
+                `;
+
+                busInfoSection.style.display = "block";
+                showMessage("Bus found successfully!", "success");
+
+                // Scroll to bus info
+                busInfoSection.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                showMessage("Error connecting to server. Please try again.", "error");
+                busInfoSection.style.display = "none";
+            }
+        }
+
+        function openLiveTracking() {
+            if (currentBusUrl) {
+                window.open(currentBusUrl, '_blank');
+            } else {
+                showMessage("No tracking URL available for this bus.", "error");
+            }
+        }
+
+        function resetSearch() {
+            document.getElementById("busNo").value = "";
+            document.getElementById("busInfoSection").style.display = "none";
+            document.getElementById("message").textContent = "";
+            currentBusUrl = '';
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById("message");
+            msg.textContent = text;
+            msg.className = `message ${type}`;
+        }
+
+        // Allow Enter key to trigger search
+        document.getElementById("busNo").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                findBus();
+            }
+        });
+    </script>
+</body>
+</html>
